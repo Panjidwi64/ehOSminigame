@@ -1,0 +1,512 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Don't let the developer touch this chicken. — ethOS</title>
+  <style>
+    :root{
+      --bg:#1a1a1a;
+      --neon:#dcdcdc;
+      --danger:#bbbbbb;
+      --panel:#2b2b2b;
+      --muted:#888888;
+      --glass: rgba(255,255,255,0.04);
+    }
+
+    html,body{
+      height:100%;
+      margin:0;
+      font-family: monospace, 'Courier New', sans-serif;
+      background: radial-gradient(ellipse at bottom right,#111 0%, #1a1a1a 60%);
+      color:var(--neon);
+      -webkit-tap-highlight-color: transparent;
+      filter: none;
+    }
+
+    .wrap{min-height:100%;display:flex;align-items:center;justify-content:center;padding:18px;box-sizing:border-box}
+
+    /* Game card */
+    .card{
+      width:920px;max-width:98vw;
+      background:linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
+      border-radius:8px;
+      padding:16px;
+      box-shadow:0 8px 24px rgba(0,0,0,0.8);
+      border:1px solid rgba(255,255,255,0.06);
+    }
+
+    .header{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+    .logo {
+  width: 56px;      /* ukuran lebar kotak logo */
+  height: 56px;     /* ukuran tinggi kotak logo */
+  border-radius: 4px;
+  background: none; /* hilangkan background lama */
+  overflow: hidden; /* biar gambar nggak keluar */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.logo img {
+  max-width: 100%;   /* supaya nggak lebih lebar dari kotak */
+  max-height: 100%;  /* supaya nggak lebih tinggi dari kotak */
+  object-fit: contain;
+}
+
+
+
+    .title{font-size:18px;font-weight:700}
+    .sub{color:var(--muted);font-size:12px}
+
+    .game-area{
+      position:relative;
+      background:linear-gradient(180deg,#111,#1a1a1a);
+      height:420px;border-radius:4px;
+      overflow:hidden;
+      border:1px solid rgba(255,255,255,0.06)
+    }
+
+    /* CRT scanlines */
+    .scanlines::after{
+      content:'';
+      position:absolute;inset:0;
+      background-image:linear-gradient(rgba(255,255,255,0.05) 1px, rgba(0,0,0,0) 1px);
+      background-size:100% 3px;
+      pointer-events:none;
+      mix-blend-mode:overlay;
+    }
+
+    /* Player */
+    .player{
+      position:absolute;
+      bottom:12px;
+      left:calc(50% - 24px);
+      width:56px;height:56px;
+      border-radius:6px;
+      background:none;
+      display:flex;align-items:center;justify-content:center;
+      font-size:30px;
+      box-shadow:none;
+      transform-origin:center;
+      user-select:none;
+    }
+    .player img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter: none;
+}
+
+
+    /* Rug (enemy) */
+    .rug{
+      position:absolute;
+      top:-90px;
+      width:110px;height:64px;
+      border-radius:6px;
+      background:linear-gradient(90deg,#777,#555);
+      display:flex;align-items:center;justify-content:center;
+      font-size:18px;color:#fff;
+      box-shadow:0 6px 12px rgba(0,0,0,0.6);
+      overflow:hidden;
+    }
+    .rug img{width:100%;height:100%;object-fit:cover;display:block;filter:grayscale(60%) contrast(0.9)}
+
+    /* UI overlay */
+    .hud{
+      position:absolute;left:12px;top:12px;
+      background:var(--glass);
+      padding:8px 10px;border-radius:6px;
+      font-size:13px;
+      border:1px solid rgba(255,255,255,0.06)
+    }
+    .hud .label{color:var(--muted);font-size:11px}
+    .hud .big{font-weight:700;font-size:16px}
+
+    .controls{display:flex;gap:8px;align-items:center;justify-content:flex-end;margin-top:12px}
+    .btn{
+      background:transparent;
+      border:1px solid rgba(255,255,255,0.1);
+      padding:8px 12px;
+      border-radius:6px;
+      color:var(--neon);
+      cursor:pointer;
+      user-select:none;
+    }
+    .btn.primary{
+      background:linear-gradient(90deg,#222,#333);
+      border:1px solid rgba(255,255,255,0.12)
+    }
+    .footer-info{display:flex;justify-content:space-between;align-items:center;margin-top:10px;color:var(--muted);font-size:13px}
+
+    /* Meme popup */
+    .meme{
+      position:absolute;left:50%;top:18px;
+      transform:translateX(-50%);
+      background:rgba(0,0,0,0.7);
+      padding:10px 14px;border-radius:6px;
+      border:1px solid rgba(255,255,255,0.08);
+      display:flex;gap:10px;align-items:center;
+      pointer-events:none;
+    }
+    .meme img{
+      width:56px;height:40px;border-radius:4px;object-fit:cover;filter:grayscale(60%);
+    }
+    .meme .txt{font-size:13px;color:var(--neon)}
+
+    /* Game over overlay */
+    .overlay{
+      position:absolute;inset:0;
+      background:rgba(0,0,0,0.8);
+      display:flex;flex-direction:column;
+      align-items:center;justify-content:center;
+      gap:12px;
+    }
+    .overlay h2{margin:0;color:#fff;font-size:28px}
+    .overlay p{margin:0;color:var(--muted)}
+
+    .note{font-size:12px;color:var(--muted)}
+
+    /* Touch controls */
+    #touchControls{
+      position:fixed;
+      left:0;right:0;bottom:8px;
+      display:flex;justify-content:space-between;align-items:center;
+      padding:0 20px;
+      pointer-events:none; /* allow buttons only */
+      z-index:60;
+    }
+    #touchControls button{
+      pointer-events:auto;
+      width:82px;height:82px;border-radius:12px;
+      background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+      border:1px solid rgba(255,255,255,0.06);
+      color:var(--neon);font-size:32px;
+      display:flex;align-items:center;justify-content:center;
+      user-select:none;
+      -webkit-user-select:none;
+      touch-action:manipulation;
+    }
+    #touchControls button:active{transform:translateY(2px)}
+
+    @media (max-width:720px){
+      .card{padding:10px}
+      .game-area{height:360px}
+      .player{width:52px;height:52px;font-size:28px}
+      .rug{width:96px;height:56px}
+      #touchControls button{width:72px;height:72px;font-size:28px;border-radius:10px}
+    }
+
+    @media (max-width:540px){
+      .card{padding:8px}
+      .game-area{height:320px}
+      .player{width:48px;height:48px;font-size:26px;bottom:8px}
+      .rug{width:84px;height:54px}
+      #touchControls button{width:64px;height:64px;font-size:26px}
+    }
+
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <div class="header">
+        <div class="logo">
+          <img src="logo.png" alt="Logo" style="width:100%;height:100%;object-fit:contain;">
+        </div>
+        <div>
+          <div class="title">Don't let the developer touch this chicken.</div>
+          <div class="sub">defend your chicken</div>
+        </div>
+      </div>
+
+      <div id="game" class="game-area scanlines">
+        <div id="hud" class="hud">
+          <div class="label">TIME</div>
+          <div id="timer" class="big">0.0s</div>
+        </div>
+
+        <div id="memePopup" class="meme" style="display:none">
+          <img id="memeImg" src="" alt="meme" />
+          <div class="txt" id="memeTxt">damn! give e a chicken</div>
+        </div>
+
+        <!-- Player: konyol (emoji) - bisa diganti ke <img> jika mau -->
+        <div id="player" class="player" aria-hidden="true">
+          <img src="daging.png" alt="Meat Player">
+        </div>
+
+        <!-- rugs will be appended here dynamically -->
+
+        <div id="overlay" class="overlay" style="display:none">
+          <h2 id="endTitle">whops</h2>
+          <p id="endMsg">You good <span id="finalTime">0.0s</span></p>
+          <div style="display:flex;gap:8px;">
+            <button id="restartBtn" class="btn primary">Play Again</button>
+            <button id="shareBtn" class="btn">Share to X</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="controls">
+        <div class="note">Use ← → or A D to move — or use the buttons on mobile</div>
+      </div>
+
+      <div class="footer-info">
+        <div class="note">Dont forget to follow <a href="https://x.com/Ethereum_OS" target="_blank" style="color:var(--neon);text-decoration:none">@Ethereum_OS</a></div>
+        <div class="note">made by : @vanzidwi</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Touch controls (visible on small screens) -->
+  <div id="touchControls" aria-hidden="false">
+    <button id="btnLeft" aria-label="left">◀</button>
+    <button id="btnRight" aria-label="right">▶</button>
+  </div>
+
+  <audio id="bgMusic" src="music.mp3" loop></audio>
+
+<script>
+/* ======= Game constants & state ======= */
+const gameEl = document.getElementById('game');
+const playerEl = document.getElementById('player');
+const timerEl = document.getElementById('timer');
+const overlay = document.getElementById('overlay');
+const finalTime = document.getElementById('finalTime');
+const endTitle = document.getElementById('endTitle');
+const memePopup = document.getElementById('memePopup');
+const memeImg = document.getElementById('memeImg');
+const memeTxt = document.getElementById('memeTxt');
+const restartBtn = document.getElementById('restartBtn');
+const shareBtn = document.getElementById('shareBtn');
+
+let gameWidth, gameHeight;
+let lastTime = 0;
+let elapsed = 0;
+let running = false;
+let rugs = [];
+let spawnTimer = 0;
+let spawnInterval = 1300; // ms
+let rugSpeed = 120; // px per second
+let memeTimer = 0;
+let memeInterval = 9000; // 9s for meme popup
+
+// Player position system: lanes (left, center, right)
+const lanes = [];
+let laneIndex = 1; // start center
+
+/* ======= Utility: WebAudio simple SFX ======= */
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+function beep(freq=440, time=0.08, type='sine', gain=0.18){
+  const o = audioCtx.createOscillator();
+  const g = audioCtx.createGain();
+  o.type = type; o.frequency.value = freq;
+  g.gain.value = gain;
+  o.connect(g); g.connect(audioCtx.destination);
+  o.start(); o.stop(audioCtx.currentTime + time);
+}
+function thunk(){beep(120,0.25,'sawtooth',0.18)} // collision sound
+function yay(){beep(800,0.12,'square',0.12); beep(1200,0.06,'square',0.07)}
+
+/* ======= Dev meme assets (inline SVG data-URLs as placeholders) =======
+   Replace these data URLs with your own image file paths if you prefer,
+   e.g. '/assets/dev1.png' or 'dev1.png' inside same folder.
+*/
+const devMemes = [
+  'dev.png'
+];
+
+
+/* ======= Initialize layout & lanes ======= */
+function resize(){
+  const rect = gameEl.getBoundingClientRect();
+  gameWidth = rect.width; gameHeight = rect.height;
+  lanes.length = 0;
+  lanes.push(gameWidth*0.18 - (playerEl.offsetWidth/2));
+  lanes.push(gameWidth*0.5 - (playerEl.offsetWidth/2));
+  lanes.push(gameWidth*0.82 - (playerEl.offsetWidth/2));
+  updatePlayerPosition();
+}
+window.addEventListener('resize',resize);
+
+function updatePlayerPosition(){
+  const x = lanes[laneIndex];
+  playerEl.style.left = x + 'px';
+}
+
+/* ======= Spawning rugs (as meme-dev images) ======= */
+function spawnRug(){
+  const el = document.createElement('div');
+  el.className = 'rug';
+  const lane = Math.floor(Math.random()*3);
+  const memeSrc = devMemes[Math.floor(Math.random()*devMemes.length)];
+  // embed image inside rug
+  el.innerHTML = `<img src="${memeSrc}" alt="dev meme">`;
+  // sometimes "troll" meme (special)
+  const isTroll = Math.random() < 0.18;
+  if(isTroll) el.dataset.troll = "1";
+  const x = lanes[lane] - (110 - (playerEl.offsetWidth))/2;
+  el.style.left = x + 'px';
+  el.style.top = '-120px';
+  gameEl.appendChild(el);
+  rugs.push({el, y:-120, x, lane, w:el.offsetWidth || 110, h:el.offsetHeight || 64, troll: !!isTroll});
+}
+
+/* ======= Game loop ======= */
+function startGame(){
+  // resume audio context on user gesture
+  if(audioCtx.state === 'suspended') audioCtx.resume();
+  // cleanup
+  rugs.forEach(r=>r.el.remove()); rugs=[];
+  spawnTimer = 0; spawnInterval = 1200; rugSpeed = 120; elapsed = 0; memeTimer = 0; laneIndex = 1; updatePlayerPosition();
+  overlay.style.display='none'; running=true; lastTime = performance.now(); requestAnimationFrame(tick);
+}
+
+function endGame(reason=''){
+  running=false;
+  finalTime.textContent = elapsed.toFixed(1) + 's';
+  endTitle.textContent = reason ? reason.toUpperCase() : 'whops';
+  overlay.style.display='flex';
+  thunk();
+}
+
+function tick(now){
+  if(!running) return;
+  const dt = (now - lastTime)/1000; lastTime = now;
+  elapsed += dt; timerEl.textContent = elapsed.toFixed(1) + 's';
+
+  // difficulty scaling
+  if(elapsed > 25) { spawnInterval = 650; rugSpeed = 240; }
+  else if(elapsed > 12) { spawnInterval = 900; rugSpeed = 170; }
+
+  // spawn
+  spawnTimer += dt*1000;
+  if(spawnTimer > spawnInterval){ spawnTimer = 0; spawnRug(); }
+
+  // update rugs
+  for(let i=rugs.length-1;i>=0;i--){
+    const r = rugs[i];
+    r.y += rugSpeed * dt;
+    r.el.style.top = r.y + 'px';
+    // remove if off screen
+    if(r.y > gameHeight + 150){ r.el.remove(); rugs.splice(i,1); continue; }
+    // collision check with player - bbox using computed positions
+    const playerRect = {x: lanes[laneIndex], y: gameHeight - playerEl.offsetHeight - 12, w: playerEl.offsetWidth, h: playerEl.offsetHeight};
+    const rugRect = (() => {
+      const left = parseFloat(r.el.style.left || r.x);
+      const top = r.y;
+      const w = r.el.offsetWidth || r.w;
+      const h = r.el.offsetHeight || r.h;
+      return {x:left, y:top, w, h};
+    })();
+    if(rectIntersect(playerRect,rugRect)){
+      // collision happened
+      if(r.troll){ showMemePopup({img:devMemes[3], txt:'Whahahaha!'}); }
+      endGame(r.troll ? 'trolled' : 'whops');
+      return;
+    }
+  }
+
+  // meme popup timer
+  memeTimer += dt*1000;
+  if(memeTimer > memeInterval){ memeTimer=0; randomMeme(); }
+
+  requestAnimationFrame(tick);
+}
+
+function rectIntersect(a,b){
+  return !(a.x + a.w < b.x || a.x > b.x + b.w || a.y + a.h < b.y || a.y > b.y + b.h);
+}
+
+/* ======= Controls ======= */
+window.addEventListener('keydown', (e)=>{
+  if(!running && e.key === ' '){ startGame(); }
+  if(e.key === 'ArrowLeft' || e.key.toLowerCase()==='a') moveLeft();
+  if(e.key === 'ArrowRight' || e.key.toLowerCase()==='d') moveRight();
+});
+
+function moveLeft(){ if(laneIndex>0){ laneIndex--; updatePlayerPosition(); beep(520,0.04,'sine',0.06);} }
+function moveRight(){ if(laneIndex<2){ laneIndex++; updatePlayerPosition(); beep(520,0.04,'sine',0.06);} }
+
+/* ======= Touch controls: tap & hold behavior ======= */
+const btnLeft = document.getElementById('btnLeft');
+const btnRight = document.getElementById('btnRight');
+let holdInterval = null;
+
+function startHold(fn){
+  // immediate
+  fn();
+  // then repeat while holding (120ms)
+  holdInterval = setInterval(fn, 120);
+}
+function stopHold(){
+  if(holdInterval){ clearInterval(holdInterval); holdInterval = null; }
+}
+
+btnLeft.addEventListener('touchstart', (e)=>{ e.preventDefault(); startHold(moveLeft); }, {passive:false});
+btnLeft.addEventListener('mousedown', (e)=>{ e.preventDefault(); startHold(moveLeft); });
+['touchend','touchcancel','mouseup','mouseleave'].forEach(ev=> btnLeft.addEventListener(ev, stopHold));
+
+btnRight.addEventListener('touchstart', (e)=>{ e.preventDefault(); startHold(moveRight); }, {passive:false});
+btnRight.addEventListener('mousedown', (e)=>{ e.preventDefault(); startHold(moveRight); });
+['touchend','touchcancel','mouseup','mouseleave'].forEach(ev=> btnRight.addEventListener(ev, stopHold));
+
+/* ======= Meme popup ======= */
+function randomMeme(){
+  const m = devMemes[Math.floor(Math.random()*devMemes.length)];
+  showMemePopup({img:m, txt:'damn! give me a chicken'});
+}
+function showMemePopup({img,txt}){
+  memeImg.src = img; memeTxt.textContent = txt; memePopup.style.display = 'flex';
+  memePopup.style.opacity = '0'; memePopup.style.transform = 'translateY(-8px)';
+  setTimeout(()=>{ memePopup.style.transition='all 260ms ease'; memePopup.style.opacity='1'; memePopup.style.transform='translateY(0)'; },20);
+  setTimeout(()=>{ memePopup.style.transition='all 260ms ease'; memePopup.style.opacity='0'; memePopup.style.transform='translateY(-8px)'; setTimeout(()=>{ memePopup.style.display='none'; },260); },3000);
+}
+
+/* ======= UI buttons ======= */
+restartBtn.addEventListener('click', ()=>{ startGame(); });
+shareBtn.addEventListener('click', ()=>{
+  const text = encodeURIComponent(`you saved chiken ${elapsed.toFixed(1)}s Don't let the developer touch this chicken.! Play: https://x.com/Ethereum_OS #sayGM #ethOS`);
+  const url = `https://x.com/intent/tweet?text=${text}`;
+  window.open(url,'_blank');
+});
+
+/* ======= Kick-off: show start hint ======= */
+window.addEventListener('load', ()=>{
+  // initial layout
+  resize();
+  overlay.style.display='flex';
+  overlay.querySelector('h2').textContent='Press Start';
+  overlay.querySelector('p').textContent='Use ← → or A D, or buttons on mobile.';
+  restartBtn.textContent='Start';
+});
+
+/* ======= Ensure layout ready ======= */
+setTimeout(resize,80);
+
+const bgMusic = document.getElementById('bgMusic');
+
+function startGame(){
+  if(audioCtx.state === 'suspended') audioCtx.resume();
+
+  // Mulai musik jika belum main
+  if(bgMusic.paused){
+    bgMusic.volume = 0.5; // volume 50%
+    bgMusic.play().catch(err => console.log(err));
+  }
+
+  rugs.forEach(r=>r.el.remove()); rugs=[];
+  spawnTimer=0; spawnInterval=1200; rugSpeed=120; elapsed=0; memeTimer=0; laneIndex=1; updatePlayerPosition();
+  overlay.style.display='none'; running=true; lastTime = performance.now(); requestAnimationFrame(tick);
+}
+
+
+
+
+
+
+</script>
+</body>
+</html>
